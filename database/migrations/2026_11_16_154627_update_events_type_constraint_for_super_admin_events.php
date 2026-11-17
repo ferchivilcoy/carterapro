@@ -1,0 +1,86 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration
+{
+    /**
+     * La tabla events tiene un CHECK con una foto de EventType. Al agregar
+     * SuperAdminGranted y SuperAdminRevoked hay que reemplazarlo para que
+     * MySQL acepte los eventos nuevos; SQLite no crea ese constraint.
+     *
+     * @var list<string>
+     */
+    private const PREVIOUS_TYPES = [
+        'client_created',
+        'client_updated',
+        'loan_created',
+        'loan_closed',
+        'loan_cancelled',
+        'loan_updated',
+        'loan_refinanced',
+        'refinance_requested',
+        'installment_generated',
+        'installment_overdue',
+        'payment_registered',
+        'payment_cancelled',
+        'reminder_generated',
+        'user_created',
+        'user_updated',
+        'login_succeeded',
+        'login_failed',
+        'logout',
+        'password_reset_requested',
+        'password_reset_completed',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const CURRENT_TYPES = [
+        ...self::PREVIOUS_TYPES,
+        'super_admin_granted',
+        'super_admin_revoked',
+    ];
+
+    public function up(): void
+    {
+        $this->replaceConstraint(self::CURRENT_TYPES);
+    }
+
+    public function down(): void
+    {
+        $this->replaceConstraint(self::PREVIOUS_TYPES);
+    }
+
+    /**
+     * @param  list<string>  $types
+     */
+    private function replaceConstraint(array $types): void
+    {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
+        $constraintExists = DB::selectOne(
+            'select CONSTRAINT_NAME from information_schema.TABLE_CONSTRAINTS
+             where TABLE_SCHEMA = database() and TABLE_NAME = ? and CONSTRAINT_NAME = ? and CONSTRAINT_TYPE = ?',
+            ['events', 'chk_events_type', 'CHECK'],
+        ) !== null;
+
+        if ($constraintExists) {
+            $serverVersion = (string) DB::getPdo()->getAttribute(PDO::ATTR_SERVER_VERSION);
+            $keyword = str_contains($serverVersion, 'MariaDB') ? 'CONSTRAINT' : 'CHECK';
+
+            DB::statement("ALTER TABLE events DROP {$keyword} chk_events_type");
+        }
+
+        $allowed = implode(', ', array_map(
+            fn (string $type): string => "'{$type}'",
+            $types,
+        ));
+
+        DB::statement("ALTER TABLE events ADD CONSTRAINT chk_events_type CHECK (event_type IN ({$allowed}))");
+    }
+};

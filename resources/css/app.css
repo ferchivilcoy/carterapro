@@ -1,0 +1,12 @@
+@import '@tabler/core/dist/css/tabler.min.css';
+@import '@tabler/icons-webfont/dist/tabler-icons.min.css';
+
+:root {
+    --tblr-font-sans-serif: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* Permite que los textos truncados dentro de flexbox reduzcan su ancho. */
+.min-w-0 {
+    min-width: 0 !important;
+}
